@@ -11,7 +11,7 @@ fi
 
 BIND_MOUNTS="-v /tmp/.X11-unix:/tmp/.X11-unix:ro -v /src:/src:rw -v /data:/data:rw"
 
-CONTAINER_ID=`docker ps -aqf name="^/${CONTAINER_NAME}"`
+CONTAINER_ID=`docker ps -aqf name="^/${CONTAINER_NAME}$"`
 
 if [ -z "${CONTAINER_ID}" ]; then
     ## At the time of container creation we run the zedContainerSetup.sh script that installs 
@@ -28,7 +28,7 @@ if [ -z "${CONTAINER_ID}" ]; then
     eval ${CMD}
 
     ## Container created in detached mode... now run the setup script
-    CONTAINER_ID=`docker ps -aqf name="^/${CONTAINER_NAME}"`
+    CONTAINER_ID=`docker ps -aqf name="^/${CONTAINER_NAME}$"`
     docker exec -it ${CONTAINER_ID} /bin/bash -c "cd /tmp \
             && cp /src/scripts/zedContainerSetup.sh . \
             && chmod +x zedContainerSetup.sh \
