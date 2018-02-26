@@ -52,16 +52,23 @@ def checkForDuplicates(inputFiles, uniqueFilesMap):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # Start the load operations and mark each future with its URL
         future_to_file = {executor.submit(calculateMD5Hash, inputFile): inputFile for inputFile in inputFiles}
+        finishedCount = 0
+        duplicatesCount = 0
+        newFilesCount = 0
         for future in concurrent.futures.as_completed(future_to_file):
+            finishedCount = finishedCount+1
             file = future_to_file[future]
             md5Hash = future.result()
             if md5Hash in uniqueFilesMap:
+                duplicatesCount = duplicatesCount + 1
                 if md5Hash in duplicateFilesMap:
                     duplicateFilesMap[md5Hash].append(file)
                 else:
                     duplicateFilesMap[md5Hash] = [uniqueFilesMap[md5Hash], file]
             else:
+                newFilesCount = newFilesCount + 1
                 uniqueFilesMap[md5Hash] = file
+            print ('{}/{} done,     {} duplicates,     {} new             '.format(finishedCount, len(inputFiles), duplicatesCount, newFilesCount), end='\r')
     return duplicateFilesMap
 
 
@@ -117,17 +124,22 @@ def main():
     args = parser.parse_args()
 
 
-    print (args.duplicateFilesDestination)
-    print (args.inputPaths)
-    print (args.uniqueFilesMapFile)
-    print (args.duplicateFilesMapFile)
+    print ('duplicateFilesDestination : {}'.format(args.duplicateFilesDestination))
+    print ('inputPaths : {}'.format(args.inputPaths))
+    print ('uniqueFilesMapFile : {}'.format(args.uniqueFilesMapFile))
+    print ('duplicateFilesMapFile : {}'.format(args.duplicateFilesMapFile))
     
     uniqueFilesMap=loadUniqueFilesMap(args.uniqueFilesMapFile)
+    print ('loadUniqueFilesMap : {} files found'.format(len(uniqueFilesMap)))
     inputFiles = buildInputFilesList(args.inputPaths, uniqueFilesMap)
+    print ('buildInputFilesList : {} files found'.format(len(inputFiles)))
     duplicateFilesMap = checkForDuplicates(inputFiles, uniqueFilesMap)
     moveTheDuplicates(duplicateFilesMap, args.duplicateFilesDestination)
     saveFileList(uniqueFilesMap, args.uniqueFilesMapFile, duplicateFilesMap, args.duplicateFilesMapFile)
 
-
-# cProfile.run('main()')
-main()
+profileOutputFile = '/data/profile_{}'.format(time.strftime("%Y-%m-%d-%H-%M-%S"))
+cProfile.run('main()', profileOutputFile)
+import pstats
+p = pstats.Stats(profileOutputFile)
+p.sort_stats('cumulative').print_stats(10)
+# main()
