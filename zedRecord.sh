@@ -3,5 +3,4 @@
 
 CONTAINER_NAME=zedDevEnvironment
 
-docker exec -it ${CONTAINER_NAME} /bin/bash -c "cd /usr/local/zed/tools \
-    && ./ZED\ Explorer"
+docker exec -it ${CONTAINER_NAME} /bin/bash -c "/src/zed-examples/svo\ recording/recording/build/ZED_SVO_Recording ${1}"
