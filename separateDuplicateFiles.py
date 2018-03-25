@@ -20,14 +20,15 @@ makeDirLock = threading.Lock()
 ## loads the file paths and hashes that are previously known
 ## also ensures that all those files are actually present on the disk
 def loadUniqueFilesMap(uniqueFilesMapFile):
-    uniqueFilesMap = json.load(open(uniqueFilesMapFile)) if path.exists(uniqueFilesMapFile) else {}
-     # We can use a with statement to ensure threads are cleaned up promptly
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        # Start the load operations and mark each future with its URL
-        future_to_file = {executor.submit(path.exists, inputFile): inputFile for inputFile in uniqueFilesMap.values()}
-        for future in concurrent.futures.as_completed(future_to_file):
-            if (not future.result()):
-                raise OSError("File not found : {}".format(future_to_file[future]))
+    with open(uniqueFilesMapFile) as fh:
+        uniqueFilesMap = json.load(fh) if path.exists(uniqueFilesMapFile) else {}
+         # We can use a with statement to ensure threads are cleaned up promptly
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            # Start the load operations and mark each future with its URL
+            future_to_file = {executor.submit(path.exists, inputFile): inputFile for inputFile in uniqueFilesMap.values()}
+            for future in concurrent.futures.as_completed(future_to_file):
+                if (not future.result()):
+                    raise OSError("File not found : {}".format(future_to_file[future]))
 
     return uniqueFilesMap
 
@@ -41,8 +42,8 @@ def buildInputFilesList(inputPaths, uniqueFilesMap):
     return inputFiles
 
 def calculateMD5Hash(file):
-    fh = open(file, "rb")
-    return hashlib.md5(fh.read()).hexdigest()
+    with open(file, "rb") as fh:
+        return hashlib.md5(fh.read()).hexdigest())
 
 ## find all the inputFiles that are already present in uniqueFilesMap and add them to the duplicateFilesMap
 ## all the new files frim teh inputFiles get added to uniqueFilesMap
