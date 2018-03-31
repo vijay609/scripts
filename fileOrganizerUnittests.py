@@ -22,7 +22,7 @@ def createRandomTestImages(basepath, width, height, start, count):
     return imagePaths
 
 ## Unittest
-class TestLoadUniqueFilesMap(unittest.TestCase):
+class TestLoadKnownFilesMap(unittest.TestCase):
     _testBasePath = os.path.join('/tmp', 'unittestdata')
 
     @classmethod
@@ -47,17 +47,17 @@ class TestLoadUniqueFilesMap(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls._testBasePath)
 
-    def test_loadingSimpleUniqueFilesMapPasses(self):
-        filesMap = dff.loadUniqueFilesMap(self._simpleFilesMap1File)
+    def test_loadingSimpleKnownFilesMapPasses(self):
+        filesMap = dff.loadKnownFilesMap(self._simpleFilesMap1File)
         filesMap = {k:v._original for (k,v) in filesMap.items()}
         sharedItems = set(filesMap.items()) \
                         & set (self._simpleFilesMap1.items())
         self.assertEqual(len(sharedItems), 5)
 
-    def test_loadingSimpleUniqueFilesMapWithBadFileNameFails(self):
+    def test_loadingSimpleKnownFilesMapWithBadFileNameFails(self):
         key, value = self._simpleFilesMap1.popitem()
         self._simpleFilesMap1[key] = value+'1'
-        filesMap = dff.loadUniqueFilesMap(self._simpleFilesMap1File)
+        filesMap = dff.loadKnownFilesMap(self._simpleFilesMap1File)
         filesMap = {k:v._original for (k,v) in filesMap.items()}
 
         sharedItems = set(filesMap.items()) \
@@ -65,8 +65,8 @@ class TestLoadUniqueFilesMap(unittest.TestCase):
         self.assertNotEqual(len(sharedItems), 5)
         self.assertEqual(len(sharedItems), 4)
 
-    def test_loadingComplexUniqueFilesMapPasses(self):
-        filesMap = dff.loadUniqueFilesMap(self._complexFilesMap1File)
+    def test_loadingComplexKnownFilesMapPasses(self):
+        filesMap = dff.loadKnownFilesMap(self._complexFilesMap1File)
         filesMap = {k:v._original for (k,v) in filesMap.items()}
         sharedItems = set(filesMap.items()) \
                         & set (self._complexFilesMap1.items())
@@ -173,7 +173,7 @@ class TestCalculateMD5Hash(unittest.TestCase):
     def setUpClass(cls):
         np.random.seed(0)
         cls._testImgs = createRandomTestImages(cls._testBasePath, 10, 10, 0, 1)
-        # cls._testImgs.extend(createRandomTestImages(cls._testBasePath, 8000, 8000, 1, 1))
+        cls._testImgs.extend(createRandomTestImages(cls._testBasePath, 8000, 8000, 1, 1))
         cls._emptyTestImg = os.path.join(cls._testBasePath, 'emptytestimg.png')
         with open(cls._emptyTestImg, 'w'):
             pass
@@ -186,7 +186,7 @@ class TestCalculateMD5Hash(unittest.TestCase):
         ## small image
         self.assertEqual(dff.calculateMD5Hash(self._testImgs[0]), "5b4f89add29ae4ad253ce90b24ca132c")
         ## big image
-        # self.assertEqual(dff.calculateMD5Hash(self._testImgs[1]), "7c4143dee5870f2dc5aebc7be1a42e32")
+        self.assertEqual(dff.calculateMD5Hash(self._testImgs[1]), "7c4143dee5870f2dc5aebc7be1a42e32")
 
     def test_calculateMD5HashWorksOnEmptyFiles(self):
         ## md5 hash for empty '' is d41d8cd98f00b204e9800998ecf8427e
@@ -203,15 +203,18 @@ class TestCheckForDuplicates(unittest.TestCase):
         cls._imagePaths4 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder2', 'folder4'), 10, 10, 10, 20)
 
         np.random.seed(0)
-        cls._imagePaths5 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder5'), 10, 10, 5, 5)
-        cls._imagePaths6 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder6'), 10, 10, 10, 10)
+        cls._imagePaths5 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder5'), 10, 10, 0, 5)
+        cls._imagePaths6 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder6'), 10, 10, 5, 10)
         np.random.seed(10)
-        cls._imagePaths6 = cls._imagePaths6.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder6'), 10, 10, 20, 10))
-        cls._knownFilesMap = {dff.calculateMD5Hash(f):dff.File(f) for f in cls._imagePaths}
+        cls._imagePaths6.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder6'), 10, 10, 20, 10))
+
+        # Write the dir structure on paper to see how we got this
+        cls._originals = cls._imagePaths + cls._imagePaths3 + cls._imagePaths6[5:10] + cls._imagePaths6[-10:]+ cls._imagePaths4[-15:]
+
         np.random.seed(0)
-        cls._imagePaths7 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder7'), 10, 10, 0, 10)
+        cls._imagePaths7Originals = createRandomTestImages(os.path.join(cls._testBasePath, 'folder7'), 10, 10, 0, 10)
         np.random.seed(0)
-        cls._imagePaths7.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder7'), 10, 10, 10, 10))
+        cls._imagePaths7 = cls._imagePaths7Originals + createRandomTestImages(os.path.join(cls._testBasePath, 'folder7'), 10, 10, 10, 10)
         np.random.seed(0)
         cls._imagePaths7.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder7'), 10, 10, 20, 10))
 
@@ -220,43 +223,50 @@ class TestCheckForDuplicates(unittest.TestCase):
         shutil.rmtree(cls._testBasePath)
 
     def test_checkForDuplicatesWorksWithNoDuplicateFiles(self):
+        knownFilesMap = {dff.calculateMD5Hash(f):dff.File(f) for f in self._imagePaths}
+
         inputFilesList = dff.buildInputFilesList([
             os.path.join(self._testBasePath, 'folder1', 'folder3'),
             os.path.join(self._testBasePath, 'folder2', 'folder4'),
-        ], self._knownFilesMap)
+        ], knownFilesMap)
 
-        filesMap = copy.deepcopy(self._knownFilesMap)
-        dff.checkForDuplicates(inputFilesList, self._knownFilesMap)
-        self.assertEqual(len(self._imagePaths3) + len(self._imagePaths4) + len(filesMap), len(self._knownFilesMap))
+        filesMap = copy.deepcopy(knownFilesMap)
+        dff.checkForDuplicates(inputFilesList, filesMap)
+        self.assertEqual(len(self._imagePaths3) + len(self._imagePaths4) + len(knownFilesMap), len(filesMap))
+        self.assertEqual(sorted(self._imagePaths3 + self._imagePaths4 + [f._original for f in knownFilesMap.values()]),
+            sorted([f._original for f in filesMap.values()]))
 
-        previouslyKnownFiles = [v._original for (k,v) in self._knownFilesMap.items()]
-        allKnownFiles = [v._original for (k,v) in filesMap.items()]
-        for f in allKnownFiles:
-            self.assertTrue(f in previouslyKnownFiles or f in self._imagePaths3 or f in self._imagePaths4)
-        for v in filesMap.values():
-            self.assertFalse(v._duplicates)
+        previouslyKnownFiles = [v._original for v in knownFilesMap.values()]
+        for f in filesMap.values():
+            self.assertTrue(f._original in previouslyKnownFiles or f._original in self._imagePaths3 or f._original in self._imagePaths4)
+            self.assertFalse(f._duplicates)
 
     def test_checkForDuplicatesWorksWithDuplicateFilesInDifferentFolders(self):
         inputFilesList = dff.buildInputFilesList([self._testBasePath], {})
         filesMap = {}
         dff.checkForDuplicates(inputFilesList, filesMap)
         self.assertEqual(len(filesMap), 40)
-        originalFileHashes = [dff.calculateMD5Hash(f._original) for f in filesMap.values() ]
+        originalFileHashes = [dff.calculateMD5Hash(f) for f in self._originals ]
         self.assertEqual(len(set(originalFileHashes)), len(originalFileHashes))
-        self.assertEqual(originalFileHashes.sort(), list(filesMap.keys()).sort())
+        self.assertEqual(sorted(originalFileHashes), sorted(list(filesMap.keys())))
+        self.assertEqual(sorted([f._original for f in filesMap.values()]), sorted(self._originals))
         ##assert duplicate file count matches
         duplicateFiles = [f for dupFiles in filesMap.values() for f in dupFiles._duplicates]
         self.assertEqual(len(duplicateFiles), 45)
+        for df in duplicateFiles:
+            self.assertNotIn(df, self._originals)
 
     def test_checkForDuplicatesWorksWithDuplicateFilesInSameFolder(self):
         inputFilesList = dff.buildInputFilesList([os.path.join(self._testBasePath, 'folder7')], {})
         filesMap = {}
         dff.checkForDuplicates(inputFilesList, filesMap)
         self.assertEqual(len(filesMap), 10)
-
+        originalFiles = [f._original for f in filesMap.values()]
         duplicateFiles = [f for dupFiles in filesMap.values() for f in dupFiles._duplicates]
-
+        self.assertEqual(sorted(originalFiles), sorted(self._imagePaths7Originals))
         self.assertEqual(len(duplicateFiles), 20)
+        for dup in duplicateFiles:
+            self.assertNotIn(dup, self._imagePaths7Originals)
 
 class TestMoveTheDuplicates(unittest.TestCase):
     _testBasePath = os.path.join('/tmp', 'unittestdata')
