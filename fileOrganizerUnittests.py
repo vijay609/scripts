@@ -302,6 +302,14 @@ class TestMoveTheDuplicates(unittest.TestCase):
         
         self.assertTrue(all([os.path.exists(f) for dupFiles in filesMap.values() for f in dupFiles._duplicates]))
         self.assertTrue(not any([os.path.exists(f) for dupFiles in filesMapBeforeMove.values() for f in dupFiles._duplicates]))
+        self.assertTrue(all([f.startswith('/tmp/duplicates/') for dupFiles in filesMap.values() for f in dupFiles._duplicates]))
+        kk = None
+        for k,v in filesMap.items():
+            if v._duplicates:
+                kk = k
+                os.remove(v._duplicates[0])
+                break
+        self.assertFalse(os.path.exists(filesMap[kk]._duplicates[0]))
         # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
 
     def test_moveTheDuplicatesWithDuplicatesInSameFoldersWorks(self):
@@ -318,6 +326,7 @@ class TestMoveTheDuplicates(unittest.TestCase):
         
         self.assertTrue(all([os.path.exists(f) for dupFiles in filesMap.values() for f in dupFiles._duplicates]))
         self.assertTrue(not any([os.path.exists(f) for dupFiles in filesMapBeforeMove.values() for f in dupFiles._duplicates]))
+        self.assertTrue(all([f.startswith('/tmp/duplicates/') for dupFiles in filesMap.values() for f in dupFiles._duplicates]))
         # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
 
 if __name__ == '__main__':

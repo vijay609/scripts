@@ -120,11 +120,8 @@ def checkForDuplicates(inputFiles, filesMap):
 
     # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
 
-## Moves the inputFile to the duplicatesFolder
-def moveFile(inputFile, duplicatesFolder):
+def moveFile(srcFile, destFile):
     try:
-        ## To join two absolute paths, we need to remove the '/' from the beginning of the second path
-        destFile = path.join(duplicatesFolder, inputFile[1:])
         destFolder = path.split(destFile)[0]
 
         # Delay acquiring a lock until necessary
@@ -135,7 +132,7 @@ def moveFile(inputFile, duplicatesFolder):
                 makedirs(destFolder)
             makeDirLock.release()
 
-        shutil.move(inputFile, destFile)
+        shutil.move(srcFile, destFile)
     except:
         logging.exception("")
         raise
@@ -143,19 +140,19 @@ def moveFile(inputFile, duplicatesFolder):
 ## moves all the duplicates from the filesMap to duplicatesDestRoot folder and preserves
 ## the original directory structure
 def moveTheDuplicates(filesMap, duplicatesDestRoot):
-    ## List comprehension to combine list of lists
-    allDuplicateFiles = [f for dupFiles in filesMap.values() for f in dupFiles._duplicates]
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_to_file = {executor.submit(moveFile, duplicateFile, duplicatesDestRoot): duplicateFile for duplicateFile in allDuplicateFiles}
-        done, notDone = concurrent.futures.wait(future_to_file, timeout=0)
-        while notDone:
-            done, notDone = concurrent.futures.wait(future_to_file, timeout=5)
-            print('Moving Files..... done {} not done {}'.format(len(done), len(notDone)))
+        moveFileFutures = {}
+        for v in filesMap.values():
+            for i in range(len(v._duplicates)):
+                srcFile = v._duplicates[i]
+                destFile = path.join(duplicatesDestRoot, srcFile[1:])
+                v._duplicates[i] = destFile
+                moveFileFuture = executor.submit(moveFile, srcFile, destFile)
 
-    for f in filesMap.values():
-        ## Two absolute paths cannot be joined using os.path.join, the '/' in front of the second path needs to be omitted
-        newDuplicatesList = [path.join(duplicatesDestRoot, df[1:]) for df in f._duplicates if f._duplicates]
-        f._duplicates = newDuplicatesList
+        done, notDone = concurrent.futures.wait(moveFileFutures, timeout=0)
+        while notDone:
+            done, notDone = concurrent.futures.wait(moveFileFutures, timeout=5)
+            print('Moving Files..... done {} not done {}'.format(len(done), len(notDone)))
 
 ## Saves the duplicate and unique files list in a json file
 def saveFileList(uniqueFilesMap, uniqueFilesMapPath, duplicateFilesMap, duplicateFilesMapPath):
