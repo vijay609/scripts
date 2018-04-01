@@ -1,5 +1,5 @@
 ## Start by loading the knownFiles list
-## Prepare the list of unique file paths
+## Prepare the list of known file paths
 ## Find duplicates using the hash
 ## move duplicates to duplicates folder
 ## the run should output [hash, originalFilePath, [duplciate 1 path, /duplicate 2 path, duplicate 3,....]]
@@ -44,9 +44,9 @@ def createFromJson(jsonObject):
 
 ## loads the file paths and hashes that are previously known
 ## also ensures that all those files are actually present on the disk
-def loadKnownFilesMap(uniqueFilesMapFile):
+def loadKnownFilesMap(knownFilesMapFile):
     filesMap = {}
-    with open(uniqueFilesMapFile) as fh:
+    with open(knownFilesMapFile) as fh:
         #filesMap = json.load(fh, object_hook=createFromJson)
         filesMap = json.load(fh)
         # We can use a with statement to ensure threads are cleaned up promptly
@@ -91,8 +91,8 @@ def getOriginalAndDuplicates(fileTupleList):
     fileTupleList.sort()
     return fileTupleList[0][1], [x[1] for x in fileTupleList[1:]]
 
-## find all the inputFiles that are already present in uniqueFilesMap and add them to the duplicateFilesMap
-## all the new files frim teh inputFiles get added to uniqueFilesMap
+## find all the inputFiles that are already present in knownFilesMap and add them to the duplicateFilesMap
+## all the new files frim teh inputFiles get added to knownFilesMap
 def checkForDuplicates(inputFiles, filesMap):
     hashToFiles = {}
     # We can use a with statement to ensure threads are cleaned up promptly
@@ -154,16 +154,11 @@ def moveTheDuplicates(filesMap, duplicatesDestRoot):
             done, notDone = concurrent.futures.wait(moveFileFutures, timeout=5)
             print('Moving Files..... done {} not done {}'.format(len(done), len(notDone)))
 
-## Saves the duplicate and unique files list in a json file
-def saveFileList(uniqueFilesMap, uniqueFilesMapPath, duplicateFilesMap, duplicateFilesMapPath):
-    duplicateFilesMapJson = json.JSONEncoder(sort_keys=True, indent=0).encode(duplicateFilesMap)
-    with open(duplicateFilesMapPath, 'w') as jsonFile:
-        jsonFile.write(duplicateFilesMapJson)
 
-
-    uniqueFilesMapJson = json.JSONEncoder(sort_keys=True, indent=0).encode(uniqueFilesMap)
-    with open(uniqueFilesMapPath, 'w') as jsonFile:
-        jsonFile.write(uniqueFilesMapJson)
+## Saves the duplicate and known files list in a json file
+def saveFileList(filesMap, knownFilesMapPath, allFilesMapPath):
+    print(json.dump(filesMap, knownFilesMapPath, default=lambda o : o._original, indent=1))
+    print(json.dump(filesMap, allFilesMapPath, default=lambda o : o.__dict__, indent=1))
 
 # def main():
 #     parser = argparse.ArgumentParser()

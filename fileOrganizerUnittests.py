@@ -329,5 +329,34 @@ class TestMoveTheDuplicates(unittest.TestCase):
         self.assertTrue(all([f.startswith('/tmp/duplicates/') for dupFiles in filesMap.values() for f in dupFiles._duplicates]))
         # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
 
+class TestSaveFilesMap(unittest.TestCase):
+    _testBasePath = os.path.join('/tmp', 'unittestdata')
+
+    @classmethod
+    def setUpClass(cls):
+        np.random.seed(0)
+        cls._imagePaths1 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder1'), 10, 10, 0, 10)
+        np.random.seed(0)
+        cls._imagePaths2 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder2'), 10, 10, 0, 5)
+
+        np.random.seed(10)
+        cls._imagePaths3 = createRandomTestImages(os.path.join(cls._testBasePath, 'folder3'), 10, 10, 0, 10)
+        np.random.seed(10)
+        cls._imagePaths3.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder4'), 10, 10, 10, 5))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._testBasePath)
+        shutil.rmtree('/tmp/duplicates')
+
+    def test_saveFilesMapWorks(self):
+        inputFilesList = dff.buildInputFilesList([self._testBasePath], {})
+        filesMap = {}
+        dff.checkForDuplicates(inputFilesList, filesMap)
+        dff.moveTheDuplicates(filesMap, '/tmp/duplicates')
+        dff.saveFileList(filesMap, '/tmp/logs/knownFiles.json', '/tmp/logs/allFiles.json')
+        # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
+
+
 if __name__ == '__main__':
     unittest.main()
