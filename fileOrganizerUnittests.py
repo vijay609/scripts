@@ -28,17 +28,17 @@ class TestLoadKnownFilesMap(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(0)
-        imagePaths = createRandomTestImages(cls._testBasePath, 10, 10, 0, 5)
-        cls._simpleFilesMap1 = {dff.calculateMD5Hash(img): img for img in imagePaths}
+        cls._imagePaths = createRandomTestImages(cls._testBasePath, 10, 10, 0, 5)
+        cls._simpleFilesMap1 = {dff.calculateMD5Hash(img): img for img in cls._imagePaths}
         cls._simpleFilesMap1File = os.path.join(cls._testBasePath, 'filesmap1.json')
         with open(cls._simpleFilesMap1File, 'w') as fp:
             json.dump(cls._simpleFilesMap1, fp)
 
-        imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1'), 10, 10, 0, 5))
-        imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder2'), 10, 10, 0, 5))
-        imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder3'), 10, 10, 0, 5))
-        imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder2', 'folder4'), 10, 10, 0, 5))
-        cls._complexFilesMap1 = {dff.calculateMD5Hash(img): img for img in imagePaths}
+        cls._imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1'), 10, 10, 0, 5))
+        cls._imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder2'), 10, 10, 0, 5))
+        cls._imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder1', 'folder3'), 10, 10, 0, 5))
+        cls._imagePaths.extend(createRandomTestImages(os.path.join(cls._testBasePath, 'folder2', 'folder4'), 10, 10, 0, 5))
+        cls._complexFilesMap1 = {dff.calculateMD5Hash(img): img for img in cls._imagePaths}
         cls._complexFilesMap1File = os.path.join(cls._testBasePath, 'complexFilesMap.json')
         with open(cls._complexFilesMap1File, 'w') as fp:
             json.dump(cls._complexFilesMap1, fp)
@@ -71,6 +71,12 @@ class TestLoadKnownFilesMap(unittest.TestCase):
         sharedItems = set(filesMap.items()) \
                         & set (self._complexFilesMap1.items())
         self.assertEqual(len(sharedItems), 25)
+
+    def test_loadingKnownFilesMapWithInvalidPathRaisesOSError(self):
+        oldFileName = self._imagePaths[10]
+        os.rename(oldFileName, os.path.join(self._testBasePath, 'foobar.png'))
+        with self.assertRaises(OSError):
+            filesMap = dff.loadKnownFilesMap(self._complexFilesMap1File)
 
 class TestBuildInputFilesList(unittest.TestCase):
     _testBasePath = os.path.join('/tmp', 'unittestdata')
@@ -165,6 +171,10 @@ class TestBuildInputFilesList(unittest.TestCase):
         ], self._knownFilesMap)
 
         self.assertFalse(set(inputFilesList) & set(self._knownFilesMap.values()))
+    
+    def test_buildInputFilesListFailsWhenInputPathsIsNotAList(self):
+        with self.assertRaises(TypeError):
+            dff.buildInputFilesList(self._testBasePath, self._knownFilesMap)
 
 class TestCalculateMD5Hash(unittest.TestCase):
     _testBasePath = os.path.join('/tmp', 'unittestdata')
@@ -354,8 +364,23 @@ class TestSaveFilesMap(unittest.TestCase):
         filesMap = {}
         dff.checkForDuplicates(inputFilesList, filesMap)
         dff.moveTheDuplicates(filesMap, '/tmp/duplicates')
-        dff.saveFileList(filesMap, '/tmp/logs/knownFiles.json', '/tmp/logs/allFiles.json')
-        # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
+        knownFilesPath = '/tmp/logs/knownFiles.json'
+        allFilesPath = '/tmp/logs/allFiles.json'
+        if os.path.exists(knownFilesPath):
+            os.remove(knownFilesPath)
+        if os.path.exists(allFilesPath):
+            os.remove(allFilesPath)
+        self.assertFalse(os.path.exists(knownFilesPath))
+        self.assertFalse(os.path.exists(allFilesPath))
+        dff.saveFileList(filesMap, knownFilesPath, allFilesPath)
+        self.assertTrue(os.path.exists(knownFilesPath))
+        self.assertTrue(os.path.exists(allFilesPath))
+
+        # Test that the file is loadable
+        filesMapNew = dff.loadKnownFilesMap(knownFilesPath)
+        self.assertEqual(len(filesMap), len(filesMapNew))
+        self.assertEqual(sorted(filesMap.keys()), sorted(filesMapNew.keys()))
+
 
 
 if __name__ == '__main__':

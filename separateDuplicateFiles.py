@@ -50,10 +50,10 @@ def loadKnownFilesMap(knownFilesMapFile):
         #filesMap = json.load(fh, object_hook=createFromJson)
         filesMap = json.load(fh)
         # We can use a with statement to ensure threads are cleaned up promptly
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             for filePath, present in zip(filesMap.values(), executor.map(path.exists, filesMap.values())):
                 if not present:
-                    print(filePath+" doesn't exist")
+                    raise OSError("Invalid file path : {}".format(filePath))
 
         filesMap = {k:File(v) for (k,v) in filesMap.items()}
 
@@ -62,6 +62,9 @@ def loadKnownFilesMap(knownFilesMapFile):
 ## creates and returns a list of all the file paths from the inputPaths that are not
 ## known(not present in knownFilesMap)
 def buildInputFilesList(inputPaths, knownFilesMap):
+    if type(inputPaths) is not list:
+        raise TypeError("buildInputFilesList expects a list of input paths")
+
     inputFiles = []
     knownFilesMap = knownFilesMap or {}
     knownFiles = [file._original for file in knownFilesMap.values()]
@@ -113,7 +116,7 @@ def checkForDuplicates(inputFiles, filesMap):
     # and a list of tuples (index, file) as value. Since which thread in the threadpool returns first is
     # not deterministic, we can use the index of the file for sorting each list in hashToFiles and pick
     # the top one (after sorting) as the original
-    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ThreadPoolExecutor() as executor:
         for md5Hash, (original, duplicates) in zip (hashToFiles.keys(), executor.map(getOriginalAndDuplicates, hashToFiles.values())):
             assert (md5Hash not in filesMap.keys())
             filesMap[md5Hash] = File (original, duplicates)
@@ -157,8 +160,10 @@ def moveTheDuplicates(filesMap, duplicatesDestRoot):
 
 ## Saves the duplicate and known files list in a json file
 def saveFileList(filesMap, knownFilesMapPath, allFilesMapPath):
-    print(json.dump(filesMap, knownFilesMapPath, default=lambda o : o._original, indent=1))
-    print(json.dump(filesMap, allFilesMapPath, default=lambda o : o.__dict__, indent=1))
+    with open(knownFilesMapPath, 'w') as fw:
+        json.dump(filesMap, fw, default=lambda o : o._original, indent=1)
+    with open(allFilesMapPath, 'w') as fw:
+        json.dump(filesMap, fw, default=lambda o : o.__dict__, indent=1)
 
 # def main():
 #     parser = argparse.ArgumentParser()
