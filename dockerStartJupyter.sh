@@ -3,7 +3,7 @@
 CONTAINER_NAME=jupyterServer
 IMAGE_NAME=continuumio/anaconda3:5.0.1
 
-BIND_MOUNTS="-v /src:/src:rw -v /data:/data:rw -v /media/vijay/Data/Pictures:/media/vijay/Data/Pictures:rw"
+BIND_MOUNTS="-v /src:/src:rw -v /data:/data:rw -v /media/:/media:rw"
 
 CONTAINER_ID=`docker ps -aqf name="^/${CONTAINER_NAME}$"`
 
