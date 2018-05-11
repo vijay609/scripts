@@ -26,10 +26,10 @@ def createRandomTestImages(basepath, width, height, start, count):
 
 def main():
     base_path = '/tmp/profiler'
-    # np.random.seed(0)
-    # createRandomTestImages(base_path, 100, 100, 0, 10000 )
-    # np.random.seed(0)
-    # createRandomTestImages(base_path, 100, 100, 10000, 10000 )
+    np.random.seed(0)
+    createRandomTestImages(base_path, 100, 100, 0, 10)
+    np.random.seed(0)
+    createRandomTestImages(base_path, 100, 100, 50000, 10)
     # images = glob.glob('/tmp/profiler/*.png')
     # filesMap = {dff.calculateMD5Hash(f) : f for f in images}
     # with open('/tmp/filesMap.json','w') as fw:

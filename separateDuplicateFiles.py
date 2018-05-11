@@ -18,12 +18,14 @@ import threading
 import argparse
 import cProfile
 import pprint
+import multiprocessing
+import pstats
 makeDirLock = threading.Lock()
 
 class File:
-    def __init__(self, original, duplicates = []):
+    def __init__(self, original, duplicates=None):
         self._original = original
-        self._duplicates = duplicates
+        self._duplicates = [] if duplicates is None else duplicates
 
     def addDuplicate(self, duplicate):
         self._duplicates.append(duplicate)
@@ -34,8 +36,7 @@ from innermost level to outermost level.
 '''
 def createFromJson(jsonObject):
     if '_original' in jsonObject and '_duplicates' in jsonObject :
-        f = File(jsonObject['_original'])
-        f._duplicates = jsonObject['_duplicates']
+        f = File(jsonObject['_original'], jsonObject['_duplicates'])
         return f
     elif type(list(jsonObject.values())[0]) is File:
         filesmap = {}
@@ -54,13 +55,14 @@ def loadKnownFilesMap(knownFilesMapFile):
     with open(knownFilesMapFile) as fh:
         #filesMap = json.load(fh, object_hook=createFromJson)
         filesMap = json.load(fh)
-        # We can use a with statement to ensure threads are cleaned up promptly
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for filePath, present in zip(filesMap.values(), executor.map(path.exists, filesMap.values())):
-                if not present:
-                    raise OSError("Invalid file path : {}".format(filePath))
 
-        filesMap = {k:File(v) for (k,v) in filesMap.items()}
+    # We can use a with statement to ensure threads are cleaned up promptly
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for filePath, present in zip(filesMap.values(), executor.map(path.exists, filesMap.values())):
+            if not present:
+                raise OSError("Invalid file path : {}".format(filePath))
+
+    filesMap = {k:File(v) for (k,v) in filesMap.items()}
 
     return filesMap
 
@@ -114,18 +116,21 @@ all the new files frim teh inputFiles get added to knownFilesMap
 '''
 def checkForDuplicates(inputFiles, filesMap):
     hashToFiles = {}
+    numDuplicates = 0
     # We can use a with statement to ensure threads are cleaned up promptly
     with concurrent.futures.ProcessPoolExecutor() as executor:
         '''In order to preserve the order of the inputFiles we use enumerate(inputFiles) which returns tuples
         of the form (index, inputFile) and combine that with the hash of the input file into a single tuple
         '''
-        # optimal number of chunks should be same as the number of processors/cores (12 in our case)
-        for (index, inputFile), md5Hash in zip(enumerate(inputFiles), executor.map(calculateMD5Hash, inputFiles, chunksize=len(inputFiles)//12)):
+        # optimal number of chunks should be same as the number of processors/cores 
+        for (index, inputFile), md5Hash in zip(enumerate(inputFiles), executor.map(calculateMD5Hash, inputFiles, chunksize=len(inputFiles)//multiprocessing.cpu_count())):
             if md5Hash in filesMap:
                 filesMap[md5Hash].addDuplicate(inputFile)
+                numDuplicates += 1
 
             elif md5Hash in hashToFiles:
                 hashToFiles[md5Hash].append((index, inputFile))
+                numDuplicates += 1
 
             else:
                 hashToFiles[md5Hash] = [(index, inputFile)]
@@ -141,6 +146,7 @@ def checkForDuplicates(inputFiles, filesMap):
             assert (md5Hash not in filesMap.keys())
             filesMap[md5Hash] = File (original, duplicates)
 
+    return numDuplicates
     # print(json.dumps(filesMap, default=lambda o : o.__dict__, indent=2))
 
 def moveFile(srcFile, destFile):
@@ -165,14 +171,14 @@ moves all the duplicates from the filesMap to duplicatesDestRoot folder and pres
 the original directory structure
 '''
 def moveTheDuplicates(filesMap, duplicatesDestRoot):
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        moveFileFutures = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        moveFileFutures = []
         for v in filesMap.values():
             for i in range(len(v._duplicates)):
                 srcFile = v._duplicates[i]
                 destFile = path.join(duplicatesDestRoot, srcFile[1:])
                 v._duplicates[i] = destFile
-                moveFileFuture = executor.submit(moveFile, srcFile, destFile)
+                moveFileFutures.append(executor.submit(moveFile, srcFile, destFile))
 
         done, notDone = concurrent.futures.wait(moveFileFutures, timeout=0)
         while notDone:
@@ -187,31 +193,46 @@ def saveFileList(filesMap, knownFilesMapPath, allFilesMapPath):
     with open(allFilesMapPath, 'w') as fw:
         json.dump(filesMap, fw, default=lambda o : o.__dict__, indent=1)
 
-# def main():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('-d','--duplicateFilesDestination',help="Path where all the duplicate files will by moved to", required=True)
-#     parser.add_argument('-i', '--inputPaths', help='List of input paths to search', required=True, nargs='+')
-#     parser.add_argument('-u', '--uniqueFilesMapFile', help='path to unique file paths json file. All the new files get added to this list', required=True)
-#     parser.add_argument('-df', '--duplicateFilesMapFile', help='path to duplicate file paths json file. The file will be overwritten if it already exists', required=True)
-#     args = parser.parse_args()
+def main():
+    timestr = time.strftime("%Y-%m-%d-%H-%M-%S")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d','--duplicateFilesDestination',help="Path where all the duplicate files will by moved to", required=True)
+    parser.add_argument('-i', '--inputPaths', help='List of input paths to search', required=True, nargs='+')
+    parser.add_argument('-k', '--knownFilesMapFile', help='path to known file paths json file.')
+    parser.add_argument('-l', '--logDirectory', help='path to the logs directory where the new filesMap will be written to', required=True)
+    args = parser.parse_args()
 
 
-#     print ('duplicateFilesDestination : {}'.format(args.duplicateFilesDestination))
-#     print ('inputPaths : {}'.format(args.inputPaths))
-#     print ('uniqueFilesMapFile : {}'.format(args.uniqueFilesMapFile))
-#     print ('duplicateFilesMapFile : {}'.format(args.duplicateFilesMapFile))
+    print ('duplicateFilesDestination : {}'.format(args.duplicateFilesDestination))
+    print ('inputPaths : {}'.format(args.inputPaths))
+    print ('knownFilesMapFile : {}'.format(args.knownFilesMapFile))
+    print ('logDirectory : {}'.format(args.logDirectory))
 
-#     uniqueFilesMap=loadKnownFilesMap(args.uniqueFilesMapFile)
-#     print ('loadKnownFilesMap : {} files found'.format(len(uniqueFilesMap)))
-#     inputFiles = buildInputFilesList(args.inputPaths, uniqueFilesMap)
-#     print ('buildInputFilesList : {} files found'.format(len(inputFiles)))
-#     duplicateFilesMap = checkForDuplicates(inputFiles, uniqueFilesMap)
-#     moveTheDuplicates(duplicateFilesMap, args.duplicateFilesDestination)
-#     saveFileList(uniqueFilesMap, args.uniqueFilesMapFile, duplicateFilesMap, args.duplicateFilesMapFile)
+    pr = cProfile.Profile()
 
-# profileOutputFile = '/data/profile_{}'.format(time.strftime("%Y-%m-%d-%H-%M-%S"))
-# cProfile.run('main()', profileOutputFile)
-# import pstats
-# p = pstats.Stats(profileOutputFile)
-# p.sort_stats('cumulative').print_stats(10)
-# # main()
+    profileOutputFile = path.join(args.logDirectory, 'profile_{}'.format(timestr))
+    # Start Profiling
+    pr.enable()
+    filesMap = loadKnownFilesMap(args.knownFilesMapFile) if args.knownFilesMapFile is not None else {}
+    print ('loadKnownFilesMap : {} files found'.format(len(filesMap)))
+    inputFiles = buildInputFilesList(args.inputPaths, filesMap)
+    print ('buildInputFilesList : {} files found'.format(len(inputFiles)))
+    numDuplicates = checkForDuplicates(inputFiles, filesMap)
+    print ('{} duplicates found'.format(numDuplicates))
+
+    moveTheDuplicates(filesMap, args.duplicateFilesDestination)
+    print ('done moving duplicates')
+    if path.isabs(args.logDirectory) and not path.exists(args.logDirectory):
+        makedirs(args.logDirectory)
+    print ('writing logs')
+    knownFilesMapFile = path.join(args.logDirectory, 'knownFiles_{}.json'.format(timestr))
+    allFilesMapFile = path.join(args.logDirectory, 'allFiles_{}.json'.format(timestr))
+    saveFileList(filesMap, knownFilesMapFile, allFilesMapFile)
+    pr.disable()
+    # Stop Profiling
+    pr.dump_stats(profileOutputFile)
+    p = pstats.Stats(profileOutputFile)
+    p.sort_stats('cumulative').print_stats(10)
+
+if __name__ == '__main__':
+    main()

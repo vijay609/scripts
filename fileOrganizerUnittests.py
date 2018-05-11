@@ -370,6 +370,8 @@ class TestSaveFilesMap(unittest.TestCase):
             os.remove(knownFilesPath)
         if os.path.exists(allFilesPath):
             os.remove(allFilesPath)
+        if not os.path.exists(os.path.split(knownFilesPath)[0]):
+            os.makedirs(os.path.split(knownFilesPath)[0])
         self.assertFalse(os.path.exists(knownFilesPath))
         self.assertFalse(os.path.exists(allFilesPath))
         dff.saveFileList(filesMap, knownFilesPath, allFilesPath)
