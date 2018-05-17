@@ -91,7 +91,7 @@ def buildInputFilesList(inputPaths, knownFilesMap):
             Although dirs is not used directly, sorting the list of dirs here will make
             os.walk to parse the directories in that order
             '''
-            dirs.sort()
+            dirs.sort(reverse=True)
 
     return inputFiles
 

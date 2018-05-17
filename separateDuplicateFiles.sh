@@ -64,8 +64,16 @@
 
 ################### First set of duplicates are at /media/vijay/FACEAFABCEAF5E9F/duplicates 
 ################### Second set of duplicates will be  at /media/vijay/Media1/duplicates 
+# python ./separateDuplicateFiles.py \
+#     -d /media/vijay/Media1/duplicates \
+#     -i /media/vijay/Media1/maybeduplicates \
+#     -l /media/vijay/Data/Pictures/logs \
+#     -k /media/vijay/Data/Pictures/logs/knownFiles_2018-04-27-21-21-33.json
+
 python ./separateDuplicateFiles.py \
-    -d /media/vijay/Media1/duplicates \
-    -i /media/vijay/Media1/maybeduplicates \
+    -d /media/vijay/Data/Pictures/duplicates \
+    -i /media/vijay/Data/Pictures/organize/uniqueFiles/ \
+       /media/vijay/Data/Pictures/organize/ \
+       /media/vijay/Data/Pictures/oldduplicates \
+       /media/vijay/Backup/picturesFromCUsersvijaypictures \
     -l /media/vijay/Data/Pictures/logs \
-    -k /media/vijay/Data/Pictures/logs/knownFiles_2018-04-27-21-21-33.json
