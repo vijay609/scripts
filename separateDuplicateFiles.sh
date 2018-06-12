@@ -71,7 +71,7 @@
 #     -k /media/vijay/Data/Pictures/logs/knownFiles_2018-04-27-21-21-33.json
 
 python ./separateDuplicateFiles.py \
-    -d /media/vijay/Backup/duplicates \
-    -i /media/vijay/Backup/restore/F/Pictures/ \
+    -d /media/vijay/Data/Pictures/duplicates \
+    -i /media/vijay/Data/Pictures/staging/ \
     -l /media/vijay/Data/Pictures/logs \
-    -k /media/vijay/Data/Pictures/logs/knownFiles_1.json \
+    -k /media/vijay/Data/Pictures/logs/knownFiles_2.json \

@@ -60,7 +60,8 @@ def loadKnownFilesMap(knownFilesMapFile):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for filePath, present in zip(filesMap.values(), executor.map(path.exists, filesMap.values())):
             if not present:
-                raise OSError("Invalid file path : {}".format(filePath))
+                print('Not found : {}'.format(filePath))
+            #     raise OSError("Invalid file path : {}".format(filePath))
 
     filesMap = {k:File(v) for (k,v) in filesMap.items()}
 
